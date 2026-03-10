@@ -8,7 +8,7 @@ from codemeta.codemeta import load
 from rdflib import Graph, URIRef, BNode
 from rdflib.namespace import RDF  # type: ignore
 from codemeta.common import CODEMETA, AttribDict, getstream, SDO
-from serialize_html import serialize_to_html
+from codemeta2html.serialize_html import serialize_to_html
 from codemeta.codemeta import serialize
 from jinja2 import Environment, FileSystemLoader
 
