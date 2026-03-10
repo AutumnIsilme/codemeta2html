@@ -150,134 +150,123 @@ def main():
     resources = list(g.triples((None, RDF.type, SDO.SoftwareSourceCode)))
     if not resources:
         raise Exception("No resources found in JSON-LD graph")
-    elif len(resources) == 1:
-        doc = serialize_to_html(g, res, args, contextgraph, resource_path)
-        if args.stdout:
-            print(doc)
-            exit(0)
+    
+    print(f"Writing indices", file=sys.stderr)
+    os.makedirs(args.outputdir, exist_ok=True)
+    doc = serialize_to_html(
+        g, res, args, contextgraph, resource_path, indextemplate="cardindex.html"
+    )
+    with open(
+        os.path.join(args.outputdir, "index.html"), "w", encoding="utf-8"
+    ) as fp:
+        fp.write(doc)
+    doc = serialize_to_html(
+        g, res, args, contextgraph, resource_path, indextemplate="tableindex.html"
+    )
+    os.makedirs(os.path.join(args.outputdir, "table"), exist_ok=True)
+    with open(
+        os.path.join(args.outputdir, "table", "index.html"), "w", encoding="utf-8"
+    ) as fp:
+        fp.write(doc)
+    doc = serialize_to_html(
+        g, res, args, contextgraph, resource_path, indextemplate="serviceindex.html"
+    )
+    os.makedirs(os.path.join(args.outputdir, "services"), exist_ok=True)
+    with open(
+        os.path.join(args.outputdir, "services", "index.html"),
+        "w",
+        encoding="utf-8",
+    ) as fp:
+        fp.write(doc)
 
-        os.makedirs(args.outputdir, exist_ok=True)
+
+    for format in ('json','ttl'):
+        args.output = format
         with open(
-            os.path.join(args.outputdir, "index.html"), "w", encoding="utf-8"
+            os.path.join(args.outputdir, f"data.{format}"),
+            "w",
+            encoding="utf-8",
         ) as fp:
-            fp.write(doc)
-    else:
-        print(f"Writing indices", file=sys.stderr)
-        os.makedirs(args.outputdir, exist_ok=True)
-        doc = serialize_to_html(
-            g, res, args, contextgraph, resource_path, indextemplate="cardindex.html"
-        )
+            out = serialize(g, None, args, contextgraph, None)
+            assert isinstance(out, str)
+            fp.write(out)
+
+    for res, _, _ in resources:
+        assert isinstance(res, URIRef)
+        print(f"Writing resource {res}", file=sys.stderr)
+        if (res, SDO.identifier, None) in g:
+            identifier = g.value(res, SDO.identifier)
+        else:
+            raise Exception(f"Resource {res} has no schema:identifier")
+        resdir = os.path.join(args.outputdir, str(identifier))
+        if (res, SDO.version, None) in g and g.value(res, SDO.version):
+            version = str(g.value(res, SDO.version))
+            resdir_with_version = os.path.join(
+                args.outputdir, str(identifier), version
+            )
+            os.makedirs(resdir_with_version, exist_ok=True)
+            if any(
+                c in ("/", "\\", "\t", "\n", "\b", " ", "*", "?") for c in version
+            ):
+                print(
+                    f"WARNING: Invalid version {version} for {res}, skipping...",
+                    file=sys.stderr,
+                )
+                continue
+
+            outdir = resdir_with_version #actual writing deferred until after this block
+
+            # symlink latest/ to the latest version directory
+            latestdir = os.path.join(resdir, "latest")
+            if os.path.exists(latestdir):
+                if os.path.islink(latestdir):
+                    os.unlink(latestdir)
+                else:
+                    shutil.rmtree(latestdir)
+            os.symlink(version, latestdir)
+
+            #rewrite URL if the user hits the version-less level,  a symlink to a deeper index wouldn't work because relative baseurl might break)
+            with open(
+                os.path.join(resdir, "index.html"),
+                "w",
+                encoding="utf-8",
+            ) as fp:
+                template = env.get_template("redirect.html")
+                fp.write(template.render(
+                    targetsuffix="latest/"
+                ))
+        else:
+            os.makedirs(os.path.join(resdir, "snapshot"), exist_ok=True)
+
+            outdir = os.path.join(resdir,"snapshot") #actual writing deferred until after this block
+
+            # symlink latest/ to the snapshot directory
+            latestdir = os.path.join(resdir, "latest")
+            if os.path.exists(latestdir):
+                if os.path.islink(latestdir):
+                    os.unlink(latestdir)
+                else:
+                    shutil.rmtree(latestdir)
+            os.symlink("snapshot", latestdir)
+
+        doc = serialize_to_html(g, res, args, contextgraph, resource_path)
         with open(
-            os.path.join(args.outputdir, "index.html"), "w", encoding="utf-8"
-        ) as fp:
-            fp.write(doc)
-        doc = serialize_to_html(
-            g, res, args, contextgraph, resource_path, indextemplate="tableindex.html"
-        )
-        os.makedirs(os.path.join(args.outputdir, "table"), exist_ok=True)
-        with open(
-            os.path.join(args.outputdir, "table", "index.html"), "w", encoding="utf-8"
-        ) as fp:
-            fp.write(doc)
-        doc = serialize_to_html(
-            g, res, args, contextgraph, resource_path, indextemplate="serviceindex.html"
-        )
-        os.makedirs(os.path.join(args.outputdir, "services"), exist_ok=True)
-        with open(
-            os.path.join(args.outputdir, "services", "index.html"),
+            os.path.join(outdir, "index.html"),
             "w",
             encoding="utf-8",
         ) as fp:
             fp.write(doc)
 
-
         for format in ('json','ttl'):
             args.output = format
             with open(
-                os.path.join(args.outputdir, f"data.{format}"),
+                os.path.join(outdir, f"data.{format}"),
                 "w",
                 encoding="utf-8",
             ) as fp:
-                out = serialize(g, None, args, contextgraph, None)
+                out = serialize(g, res, args, contextgraph, None)
                 assert isinstance(out, str)
                 fp.write(out)
-
-        for res, _, _ in resources:
-            assert isinstance(res, URIRef)
-            print(f"Writing resource {res}", file=sys.stderr)
-            if (res, SDO.identifier, None) in g:
-                identifier = g.value(res, SDO.identifier)
-            else:
-                raise Exception(f"Resource {res} has no schema:identifier")
-            resdir = os.path.join(args.outputdir, str(identifier))
-            if (res, SDO.version, None) in g and g.value(res, SDO.version):
-                version = str(g.value(res, SDO.version))
-                resdir_with_version = os.path.join(
-                    args.outputdir, str(identifier), version
-                )
-                os.makedirs(resdir_with_version, exist_ok=True)
-                if any(
-                    c in ("/", "\\", "\t", "\n", "\b", " ", "*", "?") for c in version
-                ):
-                    print(
-                        f"WARNING: Invalid version {version} for {res}, skipping...",
-                        file=sys.stderr,
-                    )
-                    continue
-
-                outdir = resdir_with_version #actual writing deferred until after this block
-
-                # symlink latest/ to the latest version directory
-                latestdir = os.path.join(resdir, "latest")
-                if os.path.exists(latestdir):
-                    if os.path.islink(latestdir):
-                        os.unlink(latestdir)
-                    else:
-                        shutil.rmtree(latestdir)
-                os.symlink(version, latestdir)
-
-                #rewrite URL if the user hits the version-less level,  a symlink to a deeper index wouldn't work because relative baseurl might break)
-                with open(
-                    os.path.join(resdir, "index.html"),
-                    "w",
-                    encoding="utf-8",
-                ) as fp:
-                    template = env.get_template("redirect.html")
-                    fp.write(template.render(
-                        targetsuffix="latest/"
-                    ))
-            else:
-                os.makedirs(os.path.join(resdir, "snapshot"), exist_ok=True)
-
-                outdir = os.path.join(resdir,"snapshot") #actual writing deferred until after this block
-
-                # symlink latest/ to the snapshot directory
-                latestdir = os.path.join(resdir, "latest")
-                if os.path.exists(latestdir):
-                    if os.path.islink(latestdir):
-                        os.unlink(latestdir)
-                    else:
-                        shutil.rmtree(latestdir)
-                os.symlink("snapshot", latestdir)
-
-            doc = serialize_to_html(g, res, args, contextgraph, resource_path)
-            with open(
-                os.path.join(outdir, "index.html"),
-                "w",
-                encoding="utf-8",
-            ) as fp:
-                fp.write(doc)
-
-            for format in ('json','ttl'):
-                args.output = format
-                with open(
-                    os.path.join(outdir, f"data.{format}"),
-                    "w",
-                    encoding="utf-8",
-                ) as fp:
-                    out = serialize(g, res, args, contextgraph, None)
-                    assert isinstance(out, str)
-                    fp.write(out)
 
     if not args.no_assets:
         print(f"Copying styles", file=sys.stderr)
