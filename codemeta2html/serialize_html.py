@@ -14,9 +14,9 @@ from typing import Union, IO, Optional, Sequence, Iterator
 from itertools import chain
 
 if sys.version_info.minor < 8:
-    from importlib_metadata import version as get_version  # backported
+    from importlib_metadata import version  # backported
 else:
-    from importlib.metadata import version as get_version
+    from importlib.metadata import version
 from codemeta.common import (
     AttribDict,
     REPOSTATUS,
@@ -388,6 +388,13 @@ def get_description(g: Graph, res: URIRef) -> str:
         if desc: 
             return desc
     return ""
+
+
+def get_version(s: str):
+    try:
+        return version(s)
+    except:
+        return "dev"
 
 
 def slugify(s: str, prefix: str) -> str:
