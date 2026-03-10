@@ -415,13 +415,14 @@ def serialize_to_html(
     res: Union[Sequence, URIRef, None],
     args: AttribDict,
     contextgraph: Graph,
+    resource_path: str,
     sparql_query: Optional[str] = None,
     **kwargs,
 ) -> str:
     """Serialize to HTML with RDFa"""
-    rootpath = sys.modules["codemeta2html"].__path__[0]
+    
     env = Environment(
-        loader=FileSystemLoader(os.path.join(rootpath, "templates")),
+        loader=FileSystemLoader(os.path.join(resource_path, "templates")),
         autoescape=True,
         trim_blocks=True,
         lstrip_blocks=True,

@@ -18,10 +18,6 @@ from jinja2 import Environment, FileSystemLoader
 
 def main():
     """Main entrypoint for command-line usage"""
-    try:
-        rootpath = sys.modules["codemeta2html"].__path__[0]
-    except KeyError as e:
-        rootpath = os.getcwd();
 
     parser = argparse.ArgumentParser(
         description="Convert codemeta to HTML for visualisation"
@@ -142,9 +138,10 @@ def main():
     if not isinstance(contextgraph, Graph):
         raise Exception("No contextgraph provided, required for HTML serialisation")
 
-    rootpath = sys.modules["codemeta2html"].__path__[0]
+    resource_path = os.path.dirname(__file__)
+
     env = Environment(
-        loader=FileSystemLoader(os.path.join(rootpath, "templates")),
+        loader=FileSystemLoader(os.path.join(resource_path, "templates")),
         autoescape=True,
         trim_blocks=True,
         lstrip_blocks=True,
@@ -154,7 +151,7 @@ def main():
     if not resources:
         raise Exception("No resources found in JSON-LD graph")
     elif len(resources) == 1:
-        doc = serialize_to_html(g, res, args, contextgraph, None)
+        doc = serialize_to_html(g, res, args, contextgraph, resource_path)
         if args.stdout:
             print(doc)
             exit(0)
@@ -168,14 +165,14 @@ def main():
         print(f"Writing indices", file=sys.stderr)
         os.makedirs(args.outputdir, exist_ok=True)
         doc = serialize_to_html(
-            g, res, args, contextgraph, None, indextemplate="cardindex.html"
+            g, res, args, contextgraph, resource_path, indextemplate="cardindex.html"
         )
         with open(
             os.path.join(args.outputdir, "index.html"), "w", encoding="utf-8"
         ) as fp:
             fp.write(doc)
         doc = serialize_to_html(
-            g, res, args, contextgraph, None, indextemplate="tableindex.html"
+            g, res, args, contextgraph, resource_path, indextemplate="tableindex.html"
         )
         os.makedirs(os.path.join(args.outputdir, "table"), exist_ok=True)
         with open(
@@ -183,7 +180,7 @@ def main():
         ) as fp:
             fp.write(doc)
         doc = serialize_to_html(
-            g, res, args, contextgraph, None, indextemplate="serviceindex.html"
+            g, res, args, contextgraph, resource_path, indextemplate="serviceindex.html"
         )
         os.makedirs(os.path.join(args.outputdir, "services"), exist_ok=True)
         with open(
@@ -263,7 +260,7 @@ def main():
                         shutil.rmtree(latestdir)
                 os.symlink("snapshot", latestdir)
 
-            doc = serialize_to_html(g, res, args, contextgraph, None)
+            doc = serialize_to_html(g, res, args, contextgraph, resource_path)
             with open(
                 os.path.join(outdir, "index.html"),
                 "w",
@@ -284,7 +281,7 @@ def main():
 
     if not args.no_assets:
         print(f"Copying styles", file=sys.stderr)
-        stylesrcdir = os.path.join(rootpath, "style")
+        stylesrcdir = os.path.join(resource_path, "style")
         styletgtdir = os.path.join(args.outputdir, "style")
         shutil.copytree(stylesrcdir, styletgtdir, dirs_exist_ok=True)
 
