@@ -8,7 +8,7 @@ from codemeta.codemeta import load
 from rdflib import Graph, URIRef, BNode
 from rdflib.namespace import RDF  # type: ignore
 from codemeta.common import CODEMETA, AttribDict, getstream, SDO
-from codemeta2html.html import serialize_to_html
+from serialize_html import serialize_to_html
 from codemeta.codemeta import serialize
 from jinja2 import Environment, FileSystemLoader
 
@@ -18,7 +18,10 @@ from jinja2 import Environment, FileSystemLoader
 
 def main():
     """Main entrypoint for command-line usage"""
-    rootpath = sys.modules["codemeta2html"].__path__[0]
+    try:
+        rootpath = sys.modules["codemeta2html"].__path__[0]
+    except KeyError as e:
+        rootpath = os.getcwd();
 
     parser = argparse.ArgumentParser(
         description="Convert codemeta to HTML for visualisation"
@@ -284,3 +287,6 @@ def main():
         stylesrcdir = os.path.join(rootpath, "style")
         styletgtdir = os.path.join(args.outputdir, "style")
         shutil.copytree(stylesrcdir, styletgtdir, dirs_exist_ok=True)
+
+if __name__ == "__main__":
+    main()
